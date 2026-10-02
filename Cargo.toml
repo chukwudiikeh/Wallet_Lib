@@ -1,0 +1,29 @@
+[package]
+name = "wallet_lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bdk_coin_select = "0.4.1"
+bip39 = { version = "2", features = ["rand"] }
+bitcoin = "0.32"
+miniscript = "12"
+thiserror = "2"
+
+# The test directory is `test/`, not Cargo's default `tests/`, so each
+# integration test target is declared explicitly.
+[[test]]
+name = "backendT"
+path = "test/backendT.rs"
+
+[[test]]
+name = "keysT"
+path = "test/keysT.rs"
+
+[[test]]
+name = "selectT"
+path = "test/selectT.rs"
+
+[[test]]
+name = "walletT"
+path = "test/walletT.rs"
