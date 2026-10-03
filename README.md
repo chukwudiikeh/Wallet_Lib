@@ -151,9 +151,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the transaction lifecycle and design 
 ```bash
 cargo build
 cargo test
+cargo doc --no-deps --open
 ```
 
 Integration tests live in Cargo's default `tests/` directory, so each file there is picked up automatically as its own test target.
+
+## Documentation
+
+The API docs are generated from the doc comments in the source. After running `cargo doc --no-deps`, open the crate's docs at [`target/doc/wallet_lib/index.html`](target/doc/wallet_lib/index.html). The `target/` folder is not committed, so this link only works in a local checkout after you generate the docs.
 
 ## License
 
