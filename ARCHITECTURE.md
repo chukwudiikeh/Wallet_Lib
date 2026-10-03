@@ -59,4 +59,4 @@ sequenceDiagram
 
 ## Tests
 
-Integration tests live in `test/` (declared explicitly in `Cargo.toml`): `keysT`, `selectT`, `backendT`, `walletT`. Each targets the module it is named after.
+Integration tests live in `tests/` (discovered automatically by Cargo): `keysT`, `selectT`, `backendT`, `walletT`. Each targets the module it is named after.

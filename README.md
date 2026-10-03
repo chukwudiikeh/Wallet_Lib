@@ -98,6 +98,39 @@ impl ChainBackend for MyBackend {
 }
 ```
 
+## Demo: Wallet_Cli
+
+[Wallet_Cli](https://github.com/chukwudiikeh/Wallet_Cli) is a terminal Bitcoin wallet built on `wallet_lib` to show the crate in use. It is a [ratatui](https://ratatui.rs) TUI aimed at regtest networks such as [Polar](https://lightningpolar.com), meant for learning and development.
+
+Wallet_Cli handles the UI and leaves the wallet logic to this crate:
+
+| Wallet_Cli feature | `wallet_lib` call |
+|---|---|
+| Create a wallet and show the mnemonic backup | `Wallet::generate` |
+| Restore from an existing mnemonic | `Wallet::from_mnemonic` |
+| Generate a receive address | `new_address()` |
+| View balance and UTXOs after a sync | `sync()`, `balance()`, `list_utxos()` |
+| Send a payment | `build_tx()`, `sign()`, `broadcast()` |
+
+It also shows how to write your own backend. Wallet_Cli's `CoreRpcBackend` implements `ChainBackend` on top of Bitcoin Core RPC and doesn't need node-side wallet functionality. It fetches confirmed UTXOs with `scantxoutset` and finds unconfirmed ones by scanning the mempool.
+
+To try it, clone both repositories side by side, since Wallet_Cli depends on this crate through a path dependency (`../wallet_lib`):
+
+```
+Rust/
+├── wallet_lib/
+└── Wallet_Cli/
+```
+
+Wallet_Cli also needs:
+
+- a Bitcoin Core regtest node with RPC enabled
+- a `.env` file in `Wallet_Cli/` with `RPC_URL`, `RPC_USER` and `RPC_PASS`
+- a Rust toolchain that supports edition 2024
+- system clipboard support
+
+See the [Wallet_Cli README](https://github.com/chukwudiikeh/Wallet_Cli) for the keyboard shortcuts.
+
 ## Project Layout
 
 ```
@@ -108,7 +141,7 @@ src/
 ├── select.rs    # coin selection
 ├── backend.rs   # ChainBackend trait, Utxo, FakeBackend
 └── error.rs     # Error and Result
-test/            # integration tests (backendT, keysT, selectT, walletT)
+tests/           # integration tests (backendT, keysT, selectT, walletT)
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the transaction lifecycle and design notes.
@@ -120,7 +153,7 @@ cargo build
 cargo test
 ```
 
-Integration tests live in `test/` rather than Cargo's default `tests/`, and each target is declared in `Cargo.toml`.
+Integration tests live in Cargo's default `tests/` directory, so each file there is picked up automatically as its own test target.
 
 ## License
 

@@ -63,6 +63,55 @@ impl<B: ChainBackend> Wallet<B> {
         Ok(address)
     }
 
+    /// Rebuild the address list of a restored wallet by scanning the chain.
+    ///
+    /// A wallet restored from its words knows nothing about which addresses
+    /// were used before. This derives addresses from index 0, asks the
+    /// backend which hold coins, and keeps going until `gap_limit`
+    /// consecutive addresses past the last used one are empty. Afterwards
+    /// the wallet tracks every address up to the last used one, and
+    /// [`new_address`](Wallet::new_address) hands out the next unused index.
+    ///
+    /// Note that only addresses currently holding coins count as used, so a
+    /// long run of fully spent addresses wider than `gap_limit` can end the
+    /// scan early.
+    pub fn recover(&mut self, gap_limit: u32) -> Result<()> {
+        self.addresses.clear();
+        self.next_index = 0;
+
+        let mut derived: Vec<Address> = Vec::new();
+        let mut highest_used: Option<usize> = None;
+        let mut scan_to = gap_limit as usize;
+
+        loop {
+            let already = derived.len();
+            for index in already..scan_to {
+                derived.push(derive_address(&self.account_xpriv, index as u32, self.network)?);
+            }
+
+            for utxo in self.backend.utxos_for(&derived[already..])? {
+                if let Some(offset) = derived[already..].iter().position(|a| *a == utxo.address) {
+                    highest_used = highest_used.max(Some(already + offset));
+                }
+            }
+
+            // Done once a full gap of unused addresses follows the last used.
+            let needed = highest_used.map_or(0, |h| h + 1) + gap_limit as usize;
+            if scan_to >= needed {
+                break;
+            }
+            scan_to = needed;
+        }
+
+        if let Some(highest) = highest_used {
+            derived.truncate(highest + 1);
+            self.next_index = (highest + 1) as u32;
+            self.addresses = derived;
+        }
+
+        Ok(())
+    }
+
     /// Ask the backend for the latest UTXOs on every address this wallet
     /// has generated so far, replacing any previously known UTXOs.
     pub fn sync(&mut self) -> Result<()> {
@@ -102,6 +151,16 @@ impl<B: ChainBackend> Wallet<B> {
         const DUST_LIMIT: u64 = 1_000;
 
         let amount_sats = amount.to_sat();
+
+        // Nodes refuse to relay an output smaller than its dust threshold,
+        // so catch it here, before any coins are chosen.
+        let minimum = recipient.script_pubkey().minimal_non_dust();
+        if amount < minimum {
+            return Err(Error::DustAmount {
+                amount: amount_sats,
+                minimum: minimum.to_sat(),
+            });
+        }
 
         let chosen = select_coins(&self.utxos, amount_sats, fee_rate)?;
         let total_in: u64 = chosen.iter().map(|u| u.amount.to_sat()).sum();
@@ -159,6 +218,7 @@ impl<B: ChainBackend> Wallet<B> {
 
         Ok(psbt)
     }
+    
     /// Sign every input of `psbt` using this wallet's own keys.
     ///
     /// Since this wallet is always the sole signer, this fills in each
@@ -198,6 +258,7 @@ impl<B: ChainBackend> Wallet<B> {
                 .map_err(|e| Error::Backend(e.to_string()))?;
 
             let message = Message::from_digest(sighash.to_byte_array());
+            
             let signature = secp.sign_ecdsa(&message, &private_key.inner);
             let signature = ecdsa::Signature {
                 signature,

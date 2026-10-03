@@ -1,4 +1,4 @@
-//! wallet_lib: a small, reusable Bitcoin wallet library.
+//! A Reusable Bitcoin wallet library.
 //!
 //! Create a [`Wallet`](wallet::Wallet) from a mnemonic, derive addresses
 //! with [`new_address`](wallet::Wallet::new_address), track coins with

@@ -10,20 +10,3 @@ bitcoin = "0.32"
 miniscript = "12"
 thiserror = "2"
 
-# The test directory is `test/`, not Cargo's default `tests/`, so each
-# integration test target is declared explicitly.
-[[test]]
-name = "backendT"
-path = "test/backendT.rs"
-
-[[test]]
-name = "keysT"
-path = "test/keysT.rs"
-
-[[test]]
-name = "selectT"
-path = "test/selectT.rs"
-
-[[test]]
-name = "walletT"
-path = "test/walletT.rs"

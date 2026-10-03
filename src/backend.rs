@@ -14,8 +14,11 @@ pub struct Utxo {
 /// Anything that can tell us what's sitting on the chain, given a list of
 /// addresses to check.
 pub trait ChainBackend {
+    /// Return every UTXO currently sitting on any of these addresses.
     fn utxos_for(&self, addresses: &[Address]) -> Result<Vec<Utxo>>;
 
+    /// Has this address ever appeared in any transaction, confirmed or
+    /// not, even if every coin sent to it has since been spent?
     fn has_history(&self, address: &Address) -> Result<bool>;
 
     /// Broadcast a signed transaction to the network.

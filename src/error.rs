@@ -19,6 +19,9 @@ pub enum Error {
     #[error("key derivation failed: {0}")]
     Derivation(#[from] bitcoin::bip32::Error),
 
+    #[error("amount of {amount} sats is dust: the smallest payment this address accepts is {minimum} sats")]
+    DustAmount { amount: u64, minimum: u64 },
+
     #[error("chain backend error: {0}")]
     Backend(String),
 }

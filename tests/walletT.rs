@@ -155,3 +155,95 @@ fn signs_a_valid_witness() {
     secp.verify_ecdsa(&message, &signature.signature, &public_key)
         .expect("signature should be valid");
 }
+
+#[test]
+fn recover_finds_funds_on_later_addresses_and_resumes_after_them() {
+    let account = derive_account_xpriv(WORDS, Network::Testnet).unwrap();
+    // Funds sit on index 3, past the first address but within the gap.
+    let funded = derive_address(&account, 3, Network::Testnet).unwrap();
+
+    let mut backend = FakeBackend::new();
+    backend.add_utxo(Utxo {
+        outpoint: OutPoint::new(dummy_txid(), 0),
+        address: funded,
+        amount: Amount::from_sat(1_000),
+        confirmed: true,
+    });
+
+    let mut wallet = Wallet::from_mnemonic(WORDS, Network::Testnet, backend).unwrap();
+    wallet.recover(5).unwrap();
+    wallet.sync().unwrap();
+
+    assert_eq!(wallet.balance().0, Amount::from_sat(1_000));
+
+    // The next fresh address comes after the last used one, not at 0.
+    let next = wallet.new_address().unwrap();
+    assert_eq!(next, derive_address(&account, 4, Network::Testnet).unwrap());
+}
+
+#[test]
+fn recover_follows_funds_beyond_the_first_gap() {
+    let account = derive_account_xpriv(WORDS, Network::Testnet).unwrap();
+
+    // With a gap of 3, index 2 is inside the first scan and index 4 is only
+    // reached because index 2 pushed the scan window forward.
+    let mut backend = FakeBackend::new();
+    for (n, index) in [2u32, 4].into_iter().enumerate() {
+        backend.add_utxo(Utxo {
+            outpoint: OutPoint::new(dummy_txid(), n as u32),
+            address: derive_address(&account, index, Network::Testnet).unwrap(),
+            amount: Amount::from_sat(100),
+            confirmed: true,
+        });
+    }
+
+    let mut wallet = Wallet::from_mnemonic(WORDS, Network::Testnet, backend).unwrap();
+    wallet.recover(3).unwrap();
+    wallet.sync().unwrap();
+
+    assert_eq!(wallet.balance().0, Amount::from_sat(200));
+}
+
+#[test]
+fn recover_on_an_empty_chain_starts_at_the_first_address() {
+    let account = derive_account_xpriv(WORDS, Network::Testnet).unwrap();
+
+    let mut wallet = Wallet::from_mnemonic(WORDS, Network::Testnet, FakeBackend::new()).unwrap();
+    wallet.recover(5).unwrap();
+
+    let first = wallet.new_address().unwrap();
+    assert_eq!(first, derive_address(&account, 0, Network::Testnet).unwrap());
+}
+
+#[test]
+fn refuses_to_pay_a_dust_amount() {
+    let account = derive_account_xpriv(WORDS, Network::Testnet).unwrap();
+    let funded = derive_address(&account, 0, Network::Testnet).unwrap();
+
+    let mut backend = FakeBackend::new();
+    backend.add_utxo(Utxo {
+        outpoint: OutPoint::new(dummy_txid(), 0),
+        address: funded,
+        amount: Amount::from_sat(100_000),
+        confirmed: true,
+    });
+
+    let mut wallet = Wallet::from_mnemonic(WORDS, Network::Testnet, backend).unwrap();
+    wallet.new_address().unwrap();
+    wallet.sync().unwrap();
+
+    let recipient = Address::from_str("tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx")
+        .unwrap()
+        .require_network(Network::Testnet)
+        .unwrap();
+
+    // 293 sats is one under the P2WPKH dust threshold.
+    let result = wallet.build_tx(&recipient, Amount::from_sat(293), 2.0);
+    assert!(matches!(
+        result,
+        Err(wallet_lib::error::Error::DustAmount { amount: 293, minimum: 294 })
+    ));
+
+    // 294 sats is the smallest payment that is accepted.
+    assert!(wallet.build_tx(&recipient, Amount::from_sat(294), 2.0).is_ok());
+}
